@@ -1,9 +1,10 @@
 let activeRunToken = 0;
 
-const WAIT_ACTION_MS = 550;
-const WAIT_SCROLL_MS = 700;
-const MAX_SCROLL_ROUNDS = 1200;
-const STABLE_ROUNDS_TO_STOP = 5;
+const WAIT_ACTION_BASE_MS = 550;
+const WAIT_SCROLL_BASE_MS = 700;
+const WAIT_SCROLL_MAX_MS = 2600;
+const MAX_SCROLL_ROUNDS = 2400;
+const STABLE_ROUNDS_TO_STOP = 6;
 const PROGRESS_EVERY = 20;
 
 function sleep(ms) {
@@ -64,6 +65,30 @@ function getScrollableContainer() {
   return document.scrollingElement || document.documentElement || document.body;
 }
 
+function getExpectedTrackCount() {
+  const candidates = [
+    ...document.querySelectorAll('ytmusic-detail-header-renderer .subtitle, ytmusic-detail-header-renderer #subtitle'),
+    ...document.querySelectorAll('yt-formatted-string.subtitle, ytmusic-description-shelf-renderer')
+  ];
+
+  for (const node of candidates) {
+    const text = (node.textContent || '').trim();
+    if (!text) {
+      continue;
+    }
+
+    const songMatch = text.match(/([\d,.\s]+)\s*(songs?|tracks?)/i);
+    if (songMatch) {
+      const value = parseInt(songMatch[1].replace(/[^\d]/g, ''), 10);
+      if (Number.isFinite(value) && value > 0) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
+
 function getLikeButton(row) {
   return row.querySelector(
     'ytmusic-like-button-renderer button[aria-label*="like" i], ytmusic-like-button-renderer #button-shape-like button, button[title*="Like" i]'
@@ -88,13 +113,31 @@ function isButtonActive(button) {
   return !!parent?.hasAttribute('is-toggled');
 }
 
+function getAdaptiveScrollDelay(noGrowthRounds) {
+  const stepped = WAIT_SCROLL_BASE_MS * Math.pow(1.25, Math.min(noGrowthRounds, 7));
+  return Math.min(Math.round(stepped), WAIT_SCROLL_MAX_MS);
+}
+
+function getAdaptiveActionDelay(changedCount) {
+  const tier = Math.floor(changedCount / 120);
+  const stepped = WAIT_ACTION_BASE_MS * Math.pow(1.18, Math.min(tier, 7));
+  const jitter = Math.floor(Math.random() * 120);
+  return Math.min(Math.round(stepped) + jitter, 2200);
+}
+
 async function loadAllSongs(runToken) {
   const scroller = getScrollableContainer();
+  const expectedCount = getExpectedTrackCount();
   let stableRounds = 0;
+  let noGrowthRounds = 0;
   let lastCount = 0;
   let lastHeight = -1;
 
-  broadcastStatus('Loading all songs (auto-scrolling)...');
+  broadcastStatus(
+    expectedCount
+      ? `Loading all songs (auto-scrolling). Target from header: ${expectedCount}...`
+      : 'Loading all songs (auto-scrolling)...'
+  );
 
   for (let round = 1; round <= MAX_SCROLL_ROUNDS; round += 1) {
     if (runToken !== activeRunToken) {
@@ -103,10 +146,15 @@ async function loadAllSongs(runToken) {
 
     const count = getSongRows().length;
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
-    await sleep(WAIT_SCROLL_MS);
+
+    const waitMs = getAdaptiveScrollDelay(noGrowthRounds);
+    await sleep(waitMs);
 
     const newCount = getSongRows().length;
     const newHeight = scroller.scrollHeight;
+    const hasGrowth = newCount > count || newHeight > lastHeight;
+
+    noGrowthRounds = hasGrowth ? 0 : noGrowthRounds + 1;
 
     const unchanged = newCount === count && newCount === lastCount && newHeight === lastHeight;
     stableRounds = unchanged ? stableRounds + 1 : 0;
@@ -114,18 +162,42 @@ async function loadAllSongs(runToken) {
     lastCount = newCount;
     lastHeight = newHeight;
 
-    if (round % 15 === 0) {
-      broadcastStatus(`Loading songs... found ${newCount} rows so far.`);
+    if (round % 10 === 0) {
+      broadcastStatus(
+        expectedCount
+          ? `Loading songs... ${newCount}/${expectedCount} loaded (wait ${waitMs}ms).`
+          : `Loading songs... found ${newCount} rows so far (wait ${waitMs}ms).`
+      );
     }
 
-    if (stableRounds >= STABLE_ROUNDS_TO_STOP) {
+    if (expectedCount && newCount >= expectedCount) {
       break;
+    }
+
+    if (!expectedCount && stableRounds >= STABLE_ROUNDS_TO_STOP) {
+      break;
+    }
+
+    if (expectedCount && stableRounds >= STABLE_ROUNDS_TO_STOP && newCount >= expectedCount - 2) {
+      break;
+    }
+
+    if (noGrowthRounds >= 4) {
+      scroller.scrollBy({ top: -Math.max(200, Math.floor(scroller.clientHeight * 0.5)), behavior: 'auto' });
+      await sleep(220);
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
     }
   }
 
   const total = getSongRows().length;
-  broadcastStatus(`Loading complete. Found ${total} playlist/album rows.`);
-  return total;
+
+  if (expectedCount && total < expectedCount) {
+    broadcastStatus(`Loading stopped at ${total}/${expectedCount}. YouTube may still be throttling lazy-load; run can continue.`);
+  } else {
+    broadcastStatus(`Loading complete. Found ${total} playlist/album rows.`);
+  }
+
+  return { total, expectedCount };
 }
 
 async function applyToAllSongs(mode, runToken) {
@@ -138,7 +210,7 @@ async function applyToAllSongs(mode, runToken) {
     return { message: 'Could not detect the main playlist/album track list on this page.' };
   }
 
-  await loadAllSongs(runToken);
+  const { total: loadedCount, expectedCount } = await loadAllSongs(runToken);
 
   const rows = getSongRows();
   const total = rows.length;
@@ -176,14 +248,16 @@ async function applyToAllSongs(mode, runToken) {
     if (shouldClick) {
       likeBtn.click();
       changed += 1;
-      await sleep(WAIT_ACTION_MS);
+      await sleep(getAdaptiveActionDelay(changed));
     } else {
       skipped += 1;
     }
 
     if ((i + 1) % PROGRESS_EVERY === 0 || i + 1 === total) {
       broadcastStatus(
-        `${mode === 'like' ? 'Like' : 'Unlike'} progress: ${i + 1}/${total}\nChanged: ${changed}, Skipped: ${skipped}`
+        `${mode === 'like' ? 'Like' : 'Unlike'} progress: ${i + 1}/${total}` +
+        `\nChanged: ${changed}, Skipped: ${skipped}` +
+        (expectedCount ? `\nLoaded from page: ${loadedCount}/${expectedCount}` : '')
       );
       await sleep(120);
     }
