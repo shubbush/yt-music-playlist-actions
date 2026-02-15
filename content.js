@@ -1,6 +1,6 @@
 let activeRunToken = 0;
 
-const WAIT_SHORT_MS = 300;
+const WAIT_ACTION_MS = 550;
 const WAIT_SCROLL_MS = 700;
 const MAX_SCROLL_ROUNDS = 1200;
 const STABLE_ROUNDS_TO_STOP = 5;
@@ -24,24 +24,40 @@ function isTargetPage() {
   );
 }
 
+function getTracklistContainer() {
+  const selectors = [
+    'ytmusic-browse-response ytmusic-two-column-browse-results-renderer #primary ytmusic-playlist-shelf-renderer #contents',
+    'ytmusic-browse-response ytmusic-two-column-browse-results-renderer #primary ytmusic-section-list-renderer > #contents',
+    'ytmusic-tab-renderer ytmusic-playlist-shelf-renderer #contents',
+    'ytmusic-playlist-shelf-renderer #contents'
+  ];
+
+  for (const selector of selectors) {
+    const candidate = document.querySelector(selector);
+    if (candidate?.querySelector('ytmusic-responsive-list-item-renderer')) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function getSongRows() {
-  return Array.from(document.querySelectorAll('ytmusic-responsive-list-item-renderer'))
-    .filter((row) => row.querySelector('a[href*="watch?"]') || row.querySelector('yt-formatted-string.title'));
+  const container = getTracklistContainer();
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(container.querySelectorAll(':scope > ytmusic-responsive-list-item-renderer'))
+    .filter((row) => row.querySelector('a[href*="watch?"]'));
 }
 
 function getScrollableContainer() {
-  const candidates = [
-    document.querySelector('ytmusic-app-layout #content'),
-    document.querySelector('ytmusic-app-layout'),
-    document.querySelector('#contents'),
-    document.scrollingElement,
-    document.documentElement,
-    document.body
-  ].filter(Boolean);
-
-  for (const el of candidates) {
-    if (el.scrollHeight > el.clientHeight + 50) {
-      return el;
+  const container = getTracklistContainer();
+  if (container) {
+    const scrollParent = container.closest('#contents, ytmusic-section-list-renderer, ytmusic-app-layout, #content');
+    if (scrollParent) {
+      return scrollParent;
     }
   }
 
@@ -51,12 +67,6 @@ function getScrollableContainer() {
 function getLikeButton(row) {
   return row.querySelector(
     'ytmusic-like-button-renderer button[aria-label*="like" i], ytmusic-like-button-renderer #button-shape-like button, button[title*="Like" i]'
-  );
-}
-
-function getDislikeButton(row) {
-  return row.querySelector(
-    'ytmusic-like-button-renderer button[aria-label*="dislike" i], ytmusic-like-button-renderer #button-shape-dislike button, button[title*="Dislike" i]'
   );
 }
 
@@ -114,7 +124,7 @@ async function loadAllSongs(runToken) {
   }
 
   const total = getSongRows().length;
-  broadcastStatus(`Loading complete. Found ${total} rows.`);
+  broadcastStatus(`Loading complete. Found ${total} playlist/album rows.`);
   return total;
 }
 
@@ -123,13 +133,18 @@ async function applyToAllSongs(mode, runToken) {
     return { message: 'Open a YouTube Music playlist or album page first.' };
   }
 
+  const container = getTracklistContainer();
+  if (!container) {
+    return { message: 'Could not detect the main playlist/album track list on this page.' };
+  }
+
   await loadAllSongs(runToken);
 
   const rows = getSongRows();
   const total = rows.length;
 
   if (!total) {
-    return { message: 'No songs found on this page.' };
+    return { message: 'No songs found in the main playlist/album track list.' };
   }
 
   let changed = 0;
@@ -144,22 +159,26 @@ async function applyToAllSongs(mode, runToken) {
 
     const row = rows[i];
     const likeBtn = getLikeButton(row);
-    const dislikeBtn = getDislikeButton(row);
 
-    const targetBtn = mode === 'like' ? likeBtn : dislikeBtn;
-    const alreadyApplied = isButtonActive(targetBtn);
+    if (!likeBtn) {
+      skipped += 1;
+      continue;
+    }
 
-    if (targetBtn && !alreadyApplied) {
-      targetBtn.click();
+    const liked = isButtonActive(likeBtn);
+    const shouldClick = mode === 'like' ? !liked : liked;
+
+    if (shouldClick) {
+      likeBtn.click();
       changed += 1;
-      await sleep(WAIT_SHORT_MS);
+      await sleep(WAIT_ACTION_MS);
     } else {
       skipped += 1;
     }
 
     if ((i + 1) % PROGRESS_EVERY === 0 || i + 1 === total) {
       broadcastStatus(
-        `${mode === 'like' ? 'Like' : 'Dislike'} progress: ${i + 1}/${total}\nChanged: ${changed}, Skipped: ${skipped}`
+        `${mode === 'like' ? 'Like' : 'Unlike'} progress: ${i + 1}/${total}\nChanged: ${changed}, Skipped: ${skipped}`
       );
       await sleep(120);
     }
@@ -182,10 +201,10 @@ browser.runtime.onMessage.addListener((msg) => {
     return Promise.resolve({ message });
   }
 
-  if (msg.type === 'START_LIKE_ALL' || msg.type === 'START_DISLIKE_ALL') {
+  if (msg.type === 'START_LIKE_ALL' || msg.type === 'START_UNLIKE_ALL') {
     activeRunToken += 1;
     const runToken = activeRunToken;
-    const mode = msg.type === 'START_LIKE_ALL' ? 'like' : 'dislike';
+    const mode = msg.type === 'START_LIKE_ALL' ? 'like' : 'unlike';
 
     return applyToAllSongs(mode, runToken)
       .then((result) => {

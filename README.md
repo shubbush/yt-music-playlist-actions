@@ -1,16 +1,18 @@
-# YT Music Bulk Like/Dislike (Firefox Extension)
+# YT Music Bulk Like/Unlike (Firefox Extension)
 
-This extension automates **liking or disliking every song** in the currently opened YouTube Music playlist or album.
+This extension automates **liking or removing likes for every song** in the currently opened YouTube Music playlist or album.
 
 It is designed to handle very large lists (5000+ songs) by automatically scrolling the page to force YouTube Music to load all tracks before processing.
 
 ## Features
 
 - Like all songs in current playlist/album
-- Dislike all songs in current playlist/album
+- Remove likes from all songs in current playlist/album (does **not** click dislike)
 - Stop button to cancel a running job
 - Progress updates in the popup
 - Auto-scroll loading for huge lazy-loaded playlists
+- Processes only the main playlist/album track list (ignores recommended side sections)
+- Adds a small delay (~550ms) after each changed item to avoid too many rapid requests
 
 ## Install in Firefox (temporary/developer install)
 
@@ -22,7 +24,7 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 6. Open `https://music.youtube.com/` and navigate to a playlist or album.
 7. Click the extension icon and choose:
    - **Like all songs**, or
-   - **Dislike all songs**.
+   - **Remove likes**.
 
 > Note: Temporary add-ons are removed when Firefox closes. Reload it from `about:debugging` when needed.
 
@@ -42,4 +44,4 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 ## Limitations
 
 - YouTube Music DOM can change over time, which may require selector updates.
-- Some rows that are not playable songs may be skipped.
+- Some non-track rows inside the list can still be skipped automatically.

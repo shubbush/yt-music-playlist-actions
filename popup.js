@@ -24,7 +24,7 @@ async function sendAction(action) {
 }
 
 document.getElementById('like-all').addEventListener('click', () => sendAction('START_LIKE_ALL'));
-document.getElementById('dislike-all').addEventListener('click', () => sendAction('START_DISLIKE_ALL'));
+document.getElementById('unlike-all').addEventListener('click', () => sendAction('START_UNLIKE_ALL'));
 document.getElementById('stop').addEventListener('click', () => sendAction('STOP'));
 
 browser.runtime.onMessage.addListener((msg) => {

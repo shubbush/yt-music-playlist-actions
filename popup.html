@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>YT Music Bulk Like/Dislike</title>
+  <title>YT Music Bulk Like/Unlike</title>
   <style>
     body {
       width: 280px;
@@ -46,9 +46,9 @@
       color: #07180d;
     }
 
-    button.dislike {
-      background: #f44336;
-      color: #220403;
+    button.unlike {
+      background: #ff9800;
+      color: #261500;
     }
 
     button.stop {
@@ -70,12 +70,12 @@
   </style>
 </head>
 <body>
-  <h1>YT Music Bulk Like/Dislike</h1>
+  <h1>YT Music Bulk Like/Unlike</h1>
   <p>Open a playlist or album in YouTube Music, then run one of the actions below.</p>
 
   <div class="btn-row">
     <button class="like" id="like-all">Like all songs</button>
-    <button class="dislike" id="dislike-all">Dislike all songs</button>
+    <button class="unlike" id="unlike-all">Remove likes</button>
   </div>
 
   <button class="stop" id="stop">Stop current run</button>
