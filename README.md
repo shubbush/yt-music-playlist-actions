@@ -13,6 +13,7 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 - Scrollable log history in popup so earlier messages are preserved
 - Shows expected track count from playlist header before auto-scrolling starts
 - Auto-scroll loading for huge lazy-loaded playlists using playlist header track count as a target
+- Adds anti-stall scroll rescue (last-row focus + alternate scroller nudges) when loading gets stuck
 - Processes only the main playlist/album track list (ignores recommended side sections)
 - Uses adaptive pacing/backoff between actions to reduce rapid request bursts
 

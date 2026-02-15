@@ -55,10 +55,31 @@ function getSongRows() {
 
 function getScrollableContainer() {
   const container = getTracklistContainer();
+  const candidates = [];
+
   if (container) {
-    const scrollParent = container.closest('#contents, ytmusic-section-list-renderer, ytmusic-app-layout, #content');
-    if (scrollParent) {
-      return scrollParent;
+    const fromClosest = container.closest('#contents, ytmusic-section-list-renderer, ytmusic-tab-renderer, ytmusic-app-layout, #content');
+    if (fromClosest) {
+      candidates.push(fromClosest);
+    }
+  }
+
+  candidates.push(
+    document.querySelector('ytmusic-app-layout #content'),
+    document.querySelector('ytmusic-app-layout'),
+    document.scrollingElement,
+    document.documentElement,
+    document.body
+  );
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    const canScroll = candidate.scrollHeight > candidate.clientHeight + 80;
+    if (canScroll) {
+      return candidate;
     }
   }
 
@@ -195,10 +216,10 @@ function getAdaptiveActionDelay(changedCount) {
 }
 
 async function loadAllSongs(runToken) {
-  const scroller = getScrollableContainer();
   const expectedCount = getExpectedTrackCount();
   let stableRounds = 0;
   let noGrowthRounds = 0;
+  let stallRescueAttempts = 0;
   let lastCount = 0;
   let lastHeight = -1;
 
@@ -220,15 +241,24 @@ async function loadAllSongs(runToken) {
       throw new Error('Stopped');
     }
 
+    const scroller = getScrollableContainer();
     const count = getSongRows().length;
+    const beforeHeight = scroller.scrollHeight;
+
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
+
+    const rowsBefore = getSongRows();
+    const lastRow = rowsBefore[rowsBefore.length - 1];
+    if (lastRow) {
+      lastRow.scrollIntoView({ behavior: 'auto', block: 'end' });
+    }
 
     const waitMs = getAdaptiveScrollDelay(noGrowthRounds);
     await sleep(waitMs);
 
     const newCount = getSongRows().length;
     const newHeight = scroller.scrollHeight;
-    const hasGrowth = newCount > count || newHeight > lastHeight;
+    const hasGrowth = newCount > count || newHeight > Math.max(lastHeight, beforeHeight);
 
     noGrowthRounds = hasGrowth ? 0 : noGrowthRounds + 1;
 
@@ -238,7 +268,7 @@ async function loadAllSongs(runToken) {
     lastCount = newCount;
     lastHeight = newHeight;
 
-    if (round % 10 === 0) {
+    if (round % 10 === 0 || (noGrowthRounds >= 4 && round % 3 === 0)) {
       broadcastStatus(
         expectedCount
           ? `Loading songs... ${newCount}/${expectedCount} loaded (wait ${waitMs}ms).`
@@ -259,9 +289,20 @@ async function loadAllSongs(runToken) {
     }
 
     if (noGrowthRounds >= 4) {
-      scroller.scrollBy({ top: -Math.max(200, Math.floor(scroller.clientHeight * 0.5)), behavior: 'auto' });
-      await sleep(220);
+      stallRescueAttempts += 1;
+
+      scroller.scrollBy({ top: -Math.max(220, Math.floor(scroller.clientHeight * 0.7)), behavior: 'auto' });
+      await sleep(260);
       scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' });
+
+      const pageScroller = document.scrollingElement || document.documentElement || document.body;
+      if (pageScroller && pageScroller !== scroller) {
+        pageScroller.scrollTo({ top: pageScroller.scrollHeight, behavior: 'auto' });
+      }
+
+      if (stallRescueAttempts % 3 === 0) {
+        broadcastStatus('Still stalled while loading; trying alternate scroll rescue...');
+      }
     }
   }
 
