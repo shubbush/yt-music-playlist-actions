@@ -1,6 +1,28 @@
-function setStatus(text) {
+const MAX_LOG_LINES = 300;
+const logLines = ['Idle'];
+
+function getTimeLabel() {
+  return new Date().toLocaleTimeString();
+}
+
+function renderLog() {
   const status = document.getElementById('status');
-  status.textContent = text;
+  status.textContent = logLines.join('\n');
+  status.scrollTop = status.scrollHeight;
+}
+
+function appendStatus(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) {
+    return;
+  }
+
+  logLines.push(`[${getTimeLabel()}] ${normalized}`);
+  if (logLines.length > MAX_LOG_LINES) {
+    logLines.splice(0, logLines.length - MAX_LOG_LINES);
+  }
+
+  renderLog();
 }
 
 async function getActiveTabId() {
@@ -11,15 +33,15 @@ async function getActiveTabId() {
 async function sendAction(action) {
   const tabId = await getActiveTabId();
   if (!tabId) {
-    setStatus('No active tab found.');
+    appendStatus('No active tab found.');
     return;
   }
 
   try {
     const response = await browser.tabs.sendMessage(tabId, { type: action });
-    setStatus(response?.message || 'Command sent.');
+    appendStatus(response?.message || 'Command sent.');
   } catch (err) {
-    setStatus('Unable to reach page script. Open YouTube Music first.');
+    appendStatus('Unable to reach page script. Open YouTube Music first.');
   }
 }
 
@@ -29,6 +51,8 @@ document.getElementById('stop').addEventListener('click', () => sendAction('STOP
 
 browser.runtime.onMessage.addListener((msg) => {
   if (msg?.type === 'STATUS') {
-    setStatus(msg.text);
+    appendStatus(msg.text);
   }
 });
+
+renderLog();

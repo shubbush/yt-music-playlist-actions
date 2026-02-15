@@ -65,14 +65,19 @@ function getScrollableContainer() {
   return document.scrollingElement || document.documentElement || document.body;
 }
 
+function normalizeCount(raw) {
+  const value = parseInt(String(raw).replace(/[^\d]/g, ''), 10);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function extractTrackCountMatches(text) {
   const matches = [];
   const re = /([\d][\d,.\s]*)\s*(songs?|tracks?)\b/gi;
   let match = re.exec(text);
 
   while (match) {
-    const value = parseInt(match[1].replace(/[^\d]/g, ''), 10);
-    if (Number.isFinite(value) && value > 0) {
+    const value = normalizeCount(match[1]);
+    if (value) {
       matches.push(value);
     }
     match = re.exec(text);
@@ -81,18 +86,43 @@ function extractTrackCountMatches(text) {
   return matches;
 }
 
+function extractLooseCountFromSubtitle(text) {
+  // Locale-safe fallback: YT Music usually places track count at the start of subtitle,
+  // often before a bullet, e.g. "1,600 songs • ..." or localized equivalent.
+  const firstChunk = text.split(/[•·|]/)[0] || text;
+  const firstNumber = firstChunk.match(/([\d][\d,.\s]*)/);
+  if (!firstNumber) {
+    return null;
+  }
+
+  return normalizeCount(firstNumber[1]);
+}
+
 function getExpectedTrackCount() {
-  const selector = [
+  const currentLoaded = getSongRows().length;
+
+  const preciseSelector = [
     'ytmusic-detail-header-renderer yt-formatted-string#second-subtitle',
     'ytmusic-detail-header-renderer yt-formatted-string.second-subtitle',
     'ytmusic-detail-header-renderer #second-subtitle',
-    'ytmusic-detail-header-renderer yt-formatted-string#subtitle',
-    'ytmusic-detail-header-renderer yt-formatted-string.subtitle',
-    'ytmusic-responsive-header-renderer yt-formatted-string#subtitle'
+    'ytmusic-responsive-header-renderer yt-formatted-string#second-subtitle',
+    'ytmusic-responsive-header-renderer yt-formatted-string.second-subtitle'
   ].join(', ');
 
-  const nodes = Array.from(document.querySelectorAll(selector));
-  const values = [];
+  const fallbackSubtitleSelector = [
+    'ytmusic-detail-header-renderer yt-formatted-string#subtitle',
+    'ytmusic-detail-header-renderer yt-formatted-string.subtitle',
+    'ytmusic-responsive-header-renderer yt-formatted-string#subtitle',
+    'ytmusic-responsive-header-renderer yt-formatted-string.subtitle'
+  ].join(', ');
+
+  const nodes = [
+    ...Array.from(document.querySelectorAll(preciseSelector)),
+    ...Array.from(document.querySelectorAll(fallbackSubtitleSelector))
+  ];
+
+  const explicit = [];
+  const loose = [];
 
   for (const node of nodes) {
     const content = [
@@ -107,14 +137,25 @@ function getExpectedTrackCount() {
       continue;
     }
 
-    values.push(...extractTrackCountMatches(content));
+    explicit.push(...extractTrackCountMatches(content));
+
+    const looseValue = extractLooseCountFromSubtitle(content);
+    if (looseValue) {
+      loose.push(looseValue);
+    }
   }
 
-  if (!values.length) {
-    return null;
+  const filteredExplicit = explicit.filter((value) => value >= Math.max(1, currentLoaded));
+  if (filteredExplicit.length) {
+    return Math.max(...filteredExplicit);
   }
 
-  return Math.max(...values);
+  const filteredLoose = loose.filter((value) => value >= Math.max(20, currentLoaded));
+  if (filteredLoose.length) {
+    return Math.max(...filteredLoose);
+  }
+
+  return null;
 }
 
 function getLikeButton(row) {
