@@ -6,7 +6,7 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 
 ## Features
 
-- Like all songs in current playlist/album
+- Like all songs in current playlist/album (processed bottom-to-top to preserve liked-song order)
 - Remove likes from all songs in current playlist/album (does **not** click dislike)
 - Stop button to cancel a running job
 - Progress updates in the popup

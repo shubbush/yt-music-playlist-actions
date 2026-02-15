@@ -150,14 +150,19 @@ async function applyToAllSongs(mode, runToken) {
   let changed = 0;
   let skipped = 0;
 
-  broadcastStatus(`Starting ${mode} for ${total} songs...`);
+  const processFromBottom = mode === 'like';
+  const orderedRows = processFromBottom ? [...rows].reverse() : rows;
+
+  broadcastStatus(
+    `Starting ${mode} for ${total} songs (${processFromBottom ? 'bottom-to-top' : 'top-to-bottom'})...`
+  );
 
   for (let i = 0; i < total; i += 1) {
     if (runToken !== activeRunToken) {
       throw new Error('Stopped');
     }
 
-    const row = rows[i];
+    const row = orderedRows[i];
     const likeBtn = getLikeButton(row);
 
     if (!likeBtn) {
