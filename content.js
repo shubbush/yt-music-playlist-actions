@@ -65,28 +65,56 @@ function getScrollableContainer() {
   return document.scrollingElement || document.documentElement || document.body;
 }
 
-function getExpectedTrackCount() {
-  const candidates = [
-    ...document.querySelectorAll('ytmusic-detail-header-renderer .subtitle, ytmusic-detail-header-renderer #subtitle'),
-    ...document.querySelectorAll('yt-formatted-string.subtitle, ytmusic-description-shelf-renderer')
-  ];
+function extractTrackCountMatches(text) {
+  const matches = [];
+  const re = /([\d][\d,.\s]*)\s*(songs?|tracks?)\b/gi;
+  let match = re.exec(text);
 
-  for (const node of candidates) {
-    const text = (node.textContent || '').trim();
-    if (!text) {
+  while (match) {
+    const value = parseInt(match[1].replace(/[^\d]/g, ''), 10);
+    if (Number.isFinite(value) && value > 0) {
+      matches.push(value);
+    }
+    match = re.exec(text);
+  }
+
+  return matches;
+}
+
+function getExpectedTrackCount() {
+  const selector = [
+    'ytmusic-detail-header-renderer yt-formatted-string#second-subtitle',
+    'ytmusic-detail-header-renderer yt-formatted-string.second-subtitle',
+    'ytmusic-detail-header-renderer #second-subtitle',
+    'ytmusic-detail-header-renderer yt-formatted-string#subtitle',
+    'ytmusic-detail-header-renderer yt-formatted-string.subtitle',
+    'ytmusic-responsive-header-renderer yt-formatted-string#subtitle'
+  ].join(', ');
+
+  const nodes = Array.from(document.querySelectorAll(selector));
+  const values = [];
+
+  for (const node of nodes) {
+    const content = [
+      node.textContent || '',
+      node.getAttribute('aria-label') || ''
+    ]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(' • ');
+
+    if (!content) {
       continue;
     }
 
-    const songMatch = text.match(/([\d,.\s]+)\s*(songs?|tracks?)/i);
-    if (songMatch) {
-      const value = parseInt(songMatch[1].replace(/[^\d]/g, ''), 10);
-      if (Number.isFinite(value) && value > 0) {
-        return value;
-      }
-    }
+    values.push(...extractTrackCountMatches(content));
   }
 
-  return null;
+  if (!values.length) {
+    return null;
+  }
+
+  return Math.max(...values);
 }
 
 function getLikeButton(row) {
@@ -132,6 +160,13 @@ async function loadAllSongs(runToken) {
   let noGrowthRounds = 0;
   let lastCount = 0;
   let lastHeight = -1;
+
+  broadcastStatus(
+    expectedCount
+      ? `Expected tracks from playlist header: ${expectedCount}.`
+      : 'Expected tracks from playlist header: unknown (header count not found).'
+  );
+  await sleep(180);
 
   broadcastStatus(
     expectedCount

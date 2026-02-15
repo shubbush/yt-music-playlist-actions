@@ -10,6 +10,7 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 - Remove likes from all songs in current playlist/album (does **not** click dislike)
 - Stop button to cancel a running job
 - Progress updates in the popup
+- Shows expected track count from playlist header before auto-scrolling starts
 - Auto-scroll loading for huge lazy-loaded playlists using playlist header track count as a target
 - Processes only the main playlist/album track list (ignores recommended side sections)
 - Uses adaptive pacing/backoff between actions to reduce rapid request bursts
