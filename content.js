@@ -6,15 +6,59 @@ const WAIT_SCROLL_MAX_MS = 2600;
 const MAX_SCROLL_ROUNDS = 2400;
 const STABLE_ROUNDS_TO_STOP = 6;
 const PROGRESS_EVERY = 20;
+const MAX_LOG_LINES = 500;
+
+let runLogLines = ['Idle'];
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function broadcastStatus(text) {
-  browser.runtime.sendMessage({ type: 'STATUS', text }).catch(() => {
+function getTimeLabel() {
+  return new Date().toLocaleTimeString();
+}
+
+function formatEta(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return '0s';
+  }
+
+  const totalSec = Math.ceil(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
+function appendLog(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) {
+    return;
+  }
+
+  const line = `[${getTimeLabel()}] ${normalized}`;
+  runLogLines.push(line);
+  if (runLogLines.length > MAX_LOG_LINES) {
+    runLogLines.splice(0, runLogLines.length - MAX_LOG_LINES);
+  }
+
+  browser.runtime.sendMessage({ type: 'STATUS', text: line }).catch(() => {
     // Popup may be closed; ignore.
   });
+}
+
+function resetRunLogs(startMessage) {
+  runLogLines = [];
+  appendLog(startMessage || 'New job started.');
 }
 
 function isTargetPage() {
@@ -108,8 +152,6 @@ function extractTrackCountMatches(text) {
 }
 
 function extractLooseCountFromSubtitle(text) {
-  // Locale-safe fallback: YT Music usually places track count at the start of subtitle,
-  // often before a bullet, e.g. "1,600 songs • ..." or localized equivalent.
   const firstChunk = text.split(/[•·|]/)[0] || text;
   const firstNumber = firstChunk.match(/([\d][\d,.\s]*)/);
   if (!firstNumber) {
@@ -217,20 +259,21 @@ function getAdaptiveActionDelay(changedCount) {
 
 async function loadAllSongs(runToken) {
   const expectedCount = getExpectedTrackCount();
+  const loadStartMs = Date.now();
   let stableRounds = 0;
   let noGrowthRounds = 0;
   let stallRescueAttempts = 0;
   let lastCount = 0;
   let lastHeight = -1;
 
-  broadcastStatus(
+  appendLog(
     expectedCount
       ? `Expected tracks from playlist header: ${expectedCount}.`
       : 'Expected tracks from playlist header: unknown (header count not found).'
   );
   await sleep(180);
 
-  broadcastStatus(
+  appendLog(
     expectedCount
       ? `Loading all songs (auto-scrolling). Target from header: ${expectedCount}...`
       : 'Loading all songs (auto-scrolling)...'
@@ -269,9 +312,14 @@ async function loadAllSongs(runToken) {
     lastHeight = newHeight;
 
     if (round % 10 === 0 || (noGrowthRounds >= 4 && round % 3 === 0)) {
-      broadcastStatus(
+      const elapsedMs = Date.now() - loadStartMs;
+      const eta = expectedCount && newCount > 0
+        ? formatEta(((expectedCount - newCount) / (newCount / Math.max(1, elapsedMs))))
+        : null;
+
+      appendLog(
         expectedCount
-          ? `Loading songs... ${newCount}/${expectedCount} loaded (wait ${waitMs}ms).`
+          ? `Loading songs... ${newCount}/${expectedCount} loaded (wait ${waitMs}ms${eta ? `, ETA ${eta}` : ''}).`
           : `Loading songs... found ${newCount} rows so far (wait ${waitMs}ms).`
       );
     }
@@ -301,7 +349,7 @@ async function loadAllSongs(runToken) {
       }
 
       if (stallRescueAttempts % 3 === 0) {
-        broadcastStatus('Still stalled while loading; trying alternate scroll rescue...');
+        appendLog('Still stalled while loading; trying alternate scroll rescue...');
       }
     }
   }
@@ -309,9 +357,9 @@ async function loadAllSongs(runToken) {
   const total = getSongRows().length;
 
   if (expectedCount && total < expectedCount) {
-    broadcastStatus(`Loading stopped at ${total}/${expectedCount}. YouTube may still be throttling lazy-load; run can continue.`);
+    appendLog(`Loading stopped at ${total}/${expectedCount}. YouTube may still be throttling lazy-load; run can continue.`);
   } else {
-    broadcastStatus(`Loading complete. Found ${total} playlist/album rows.`);
+    appendLog(`Loading complete. Found ${total} playlist/album rows.`);
   }
 
   return { total, expectedCount };
@@ -341,8 +389,9 @@ async function applyToAllSongs(mode, runToken) {
 
   const processFromBottom = mode === 'like';
   const orderedRows = processFromBottom ? [...rows].reverse() : rows;
+  const actionStartMs = Date.now();
 
-  broadcastStatus(
+  appendLog(
     `Starting ${mode} for ${total} songs (${processFromBottom ? 'bottom-to-top' : 'top-to-bottom'})...`
   );
 
@@ -371,10 +420,17 @@ async function applyToAllSongs(mode, runToken) {
     }
 
     if ((i + 1) % PROGRESS_EVERY === 0 || i + 1 === total) {
-      broadcastStatus(
-        `${mode === 'like' ? 'Like' : 'Unlike'} progress: ${i + 1}/${total}` +
+      const processed = i + 1;
+      const elapsedMs = Date.now() - actionStartMs;
+      const eta = processed > 0
+        ? formatEta(((total - processed) / (processed / Math.max(1, elapsedMs))))
+        : null;
+
+      appendLog(
+        `${mode === 'like' ? 'Like' : 'Unlike'} progress: ${processed}/${total}` +
         `\nChanged: ${changed}, Skipped: ${skipped}` +
-        (expectedCount ? `\nLoaded from page: ${loadedCount}/${expectedCount}` : '')
+        (expectedCount ? `\nLoaded from page: ${loadedCount}/${expectedCount}` : '') +
+        (eta ? `\nETA remaining: ${eta}` : '')
       );
       await sleep(120);
     }
@@ -390,10 +446,14 @@ browser.runtime.onMessage.addListener((msg) => {
     return undefined;
   }
 
+  if (msg.type === 'GET_LOGS') {
+    return Promise.resolve({ logs: runLogLines });
+  }
+
   if (msg.type === 'STOP') {
     activeRunToken += 1;
     const message = 'Stop requested. Current run will halt.';
-    broadcastStatus(message);
+    appendLog(message);
     return Promise.resolve({ message });
   }
 
@@ -402,16 +462,18 @@ browser.runtime.onMessage.addListener((msg) => {
     const runToken = activeRunToken;
     const mode = msg.type === 'START_LIKE_ALL' ? 'like' : 'unlike';
 
+    resetRunLogs(`New job started: ${mode === 'like' ? 'Like all songs' : 'Remove likes'}.`);
+
     return applyToAllSongs(mode, runToken)
       .then((result) => {
-        broadcastStatus(result.message);
+        appendLog(result.message);
         return result;
       })
       .catch((err) => {
         const message = err?.message === 'Stopped'
           ? 'Run stopped.'
           : `Failed: ${err?.message || String(err)}`;
-        broadcastStatus(message);
+        appendLog(message);
         return { message };
       });
   }

@@ -9,8 +9,8 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 - Like all songs in current playlist/album (processed bottom-to-top to preserve liked-song order)
 - Remove likes from all songs in current playlist/album (does **not** click dislike)
 - Stop button to cancel a running job
-- Progress updates in the popup
-- Scrollable log history in popup so earlier messages are preserved
+- Progress updates in the popup with ETA remaining estimates
+- Scrollable log history in popup so earlier messages are preserved (even after closing/reopening popup)
 - Shows expected track count from playlist header before auto-scrolling starts
 - Auto-scroll loading for huge lazy-loaded playlists using playlist header track count as a target
 - Adds anti-stall scroll rescue (last-row focus + alternate scroller nudges) when loading gets stuck

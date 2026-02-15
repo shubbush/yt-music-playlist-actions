@@ -1,14 +1,19 @@
-const MAX_LOG_LINES = 300;
-const logLines = ['Idle'];
-
-function getTimeLabel() {
-  return new Date().toLocaleTimeString();
-}
+const MAX_LOG_LINES = 500;
+let logLines = ['Idle'];
 
 function renderLog() {
   const status = document.getElementById('status');
   status.textContent = logLines.join('\n');
   status.scrollTop = status.scrollHeight;
+}
+
+function setLogs(lines) {
+  if (!Array.isArray(lines) || !lines.length) {
+    return;
+  }
+
+  logLines = lines.slice(-MAX_LOG_LINES);
+  renderLog();
 }
 
 function appendStatus(text) {
@@ -17,7 +22,7 @@ function appendStatus(text) {
     return;
   }
 
-  logLines.push(`[${getTimeLabel()}] ${normalized}`);
+  logLines.push(normalized);
   if (logLines.length > MAX_LOG_LINES) {
     logLines.splice(0, logLines.length - MAX_LOG_LINES);
   }
@@ -28,6 +33,21 @@ function appendStatus(text) {
 async function getActiveTabId() {
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   return tabs?.[0]?.id;
+}
+
+async function loadExistingLogs() {
+  const tabId = await getActiveTabId();
+  if (!tabId) {
+    renderLog();
+    return;
+  }
+
+  try {
+    const response = await browser.tabs.sendMessage(tabId, { type: 'GET_LOGS' });
+    setLogs(response?.logs);
+  } catch (err) {
+    appendStatus('Unable to fetch existing logs. Open YouTube Music first.');
+  }
 }
 
 async function sendAction(action) {
@@ -56,3 +76,4 @@ browser.runtime.onMessage.addListener((msg) => {
 });
 
 renderLog();
+loadExistingLogs();
