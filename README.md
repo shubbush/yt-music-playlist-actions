@@ -40,6 +40,7 @@ It is designed to handle very large lists (5000+ songs) by automatically scrolli
 - `popup.html` – extension popup UI
 - `popup.js` – popup logic and messaging
 - `content.js` – automation logic injected into YouTube Music pages
+- `logo.svg` – extension logo (YT Music-inspired badge with a thumbs-up center)
 
 ## Limitations
 

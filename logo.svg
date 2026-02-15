@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="YT Music thumbs up logo">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#ff5a5a"/>
+      <stop offset="100%" stop-color="#ff0000"/>
+    </radialGradient>
+  </defs>
+
+  <!-- YT Music outer look -->
+  <circle cx="256" cy="256" r="228" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#ffffff" stroke-width="24" opacity="0.95"/>
+
+  <!-- Thumb-up replacing play symbol -->
+  <g transform="translate(150 138)">
+    <rect x="0" y="98" width="56" height="126" rx="16" fill="#ffffff"/>
+    <path fill="#ffffff" d="M72 224h120c21 0 40-15 44-36l19-98c5-26-15-50-41-50h-68l10-42c4-17-9-34-27-34-10 0-19 5-24 13L72 40c-10 12-15 27-15 43v109c0 18 15 32 33 32z"/>
+    <rect x="56" y="98" width="18" height="126" rx="8" fill="#ffffff" opacity="0.86"/>
+  </g>
+</svg>

@@ -10,12 +10,19 @@
   ],
   "browser_action": {
     "default_title": "YT Music Bulk Like/Unlike",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "32": "logo.svg"
+    }
   },
   "content_scripts": [
     {
-      "matches": ["https://music.youtube.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://music.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -23,5 +30,9 @@
     "gecko": {
       "id": "ytmusic-bulk-like-dislike@example.local"
     }
+  },
+  "icons": {
+    "48": "logo.svg",
+    "96": "logo.svg"
   }
 }
