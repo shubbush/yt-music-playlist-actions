@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>YT Music Bulk Like/Dislike</title>
+  <style>
+    body {
+      width: 280px;
+      margin: 0;
+      padding: 12px;
+      font-family: Arial, sans-serif;
+      background: #0f0f0f;
+      color: #f5f5f5;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+
+    p {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: #b9b9b9;
+      line-height: 1.4;
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    button.like {
+      background: #1db954;
+      color: #07180d;
+    }
+
+    button.dislike {
+      background: #f44336;
+      color: #220403;
+    }
+
+    button.stop {
+      width: 100%;
+      background: #3a3a3a;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    #status {
+      font-size: 12px;
+      background: #1b1b1b;
+      border: 1px solid #2f2f2f;
+      border-radius: 6px;
+      padding: 8px;
+      min-height: 34px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>YT Music Bulk Like/Dislike</h1>
+  <p>Open a playlist or album in YouTube Music, then run one of the actions below.</p>
+
+  <div class="btn-row">
+    <button class="like" id="like-all">Like all songs</button>
+    <button class="dislike" id="dislike-all">Dislike all songs</button>
+  </div>
+
+  <button class="stop" id="stop">Stop current run</button>
+
+  <div id="status">Idle</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

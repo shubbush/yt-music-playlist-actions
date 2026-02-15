@@ -1,0 +1,27 @@
+{
+  "manifest_version": 2,
+  "name": "YT Music Bulk Like/Dislike",
+  "version": "1.0.0",
+  "description": "Automatically like or dislike every song in the currently opened YouTube Music playlist or album.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "https://music.youtube.com/*"
+  ],
+  "browser_action": {
+    "default_title": "YT Music Bulk Like/Dislike",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://music.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "applications": {
+    "gecko": {
+      "id": "ytmusic-bulk-like-dislike@example.local"
+    }
+  }
+}
