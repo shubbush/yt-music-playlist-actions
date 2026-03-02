@@ -1,0 +1,38 @@
+{
+  "manifest_version": 2,
+  "name": "YT Music Bulk Like/Unlike",
+  "version": "1.0.1",
+  "description": "Automatically like or remove likes for every song in the currently opened YouTube Music playlist or album.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "https://music.youtube.com/*"
+  ],
+  "browser_action": {
+    "default_title": "YT Music Bulk Like/Unlike",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "32": "logo.svg"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://music.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "applications": {
+    "gecko": {
+      "id": "ytmusic-bulk-like-dislike@example.local"
+    }
+  },
+  "icons": {
+    "48": "logo.svg",
+    "96": "logo.svg"
+  }
+}

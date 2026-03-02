@@ -1,0 +1,79 @@
+const MAX_LOG_LINES = 500;
+let logLines = ['Idle'];
+
+function renderLog() {
+  const status = document.getElementById('status');
+  status.textContent = logLines.join('\n');
+  status.scrollTop = status.scrollHeight;
+}
+
+function setLogs(lines) {
+  if (!Array.isArray(lines) || !lines.length) {
+    return;
+  }
+
+  logLines = lines.slice(-MAX_LOG_LINES);
+  renderLog();
+}
+
+function appendStatus(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) {
+    return;
+  }
+
+  logLines.push(normalized);
+  if (logLines.length > MAX_LOG_LINES) {
+    logLines.splice(0, logLines.length - MAX_LOG_LINES);
+  }
+
+  renderLog();
+}
+
+async function getActiveTabId() {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  return tabs?.[0]?.id;
+}
+
+async function loadExistingLogs() {
+  const tabId = await getActiveTabId();
+  if (!tabId) {
+    renderLog();
+    return;
+  }
+
+  try {
+    const response = await browser.tabs.sendMessage(tabId, { type: 'GET_LOGS' });
+    setLogs(response?.logs);
+  } catch (err) {
+    appendStatus('Unable to fetch existing logs. Open YouTube Music first.');
+  }
+}
+
+async function sendAction(action) {
+  const tabId = await getActiveTabId();
+  if (!tabId) {
+    appendStatus('No active tab found.');
+    return;
+  }
+
+  try {
+    const response = await browser.tabs.sendMessage(tabId, { type: action });
+    appendStatus(response?.message || 'Command sent.');
+  } catch (err) {
+    appendStatus('Unable to reach page script. Open YouTube Music first.');
+  }
+}
+
+document.getElementById('like-all').addEventListener('click', () => sendAction('START_LIKE_ALL'));
+document.getElementById('unlike-all').addEventListener('click', () => sendAction('START_UNLIKE_ALL'));
+document.getElementById('stop').addEventListener('click', () => sendAction('STOP'));
+
+browser.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === 'STATUS') {
+    appendStatus(msg.text);
+  }
+});
+
+renderLog();
+loadExistingLogs();
